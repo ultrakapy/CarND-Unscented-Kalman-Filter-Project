@@ -134,15 +134,15 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       x_(1) = meas_package.raw_measurements_[1];
     }
 
-    cout << "x_ INIT: " << x_ << "\n\n";
+    //cout << "x_ INIT: " << x_ << "\n\n";
     
     P_ << std_laspx_*std_laspx_, 0, 0, 0, 0,
       0, std_laspy_*std_laspy_, 0, 0, 0,
       0, 0, 1, 0, 0,
       0, 0, 0, 1, 0,
       0, 0, 0, 0, 1;
-    //P_ = MatrixXd::Identity(n_x_, n_x_);
-    cout << "P_ INIT: " << P_ << "\n\n";
+    
+    //cout << "P_ INIT: " << P_ << "\n\n";
 
     previous_timestamp_ = meas_package.timestamp_;
 
@@ -156,18 +156,15 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   //compute the time elapsed between the current and previous measurements
   double dt = (meas_package.timestamp_ - previous_timestamp_) / 1000000.0;	//dt - expressed in seconds
   previous_timestamp_ = meas_package.timestamp_;
-  cout << "delta_t: " << dt  << "\n\n";
-  
-  
+  //cout << "delta_t: " << dt  << "\n\n";
+    
   Prediction(dt);
 
   if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
-    cout << "--RRRR ADDDDDRRRRR--\n\n";
     if (use_radar_) {
       UpdateRadar(meas_package);
     }
   } else {
-    cout << "LLLLLLLLLLLLL ase RRRRRRRRRRR\n\n";
     if (use_laser_) {
       UpdateLidar(meas_package);
     }
@@ -286,8 +283,7 @@ void UKF::Prediction(double delta_t) {
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x;
     //angle normalization
-    while (x_diff(3) > M_PI) x_diff(3) -= 2.*M_PI;
-    while (x_diff(3) < -M_PI) x_diff(3) += 2.*M_PI;
+    x_diff(3) = normalize_angle(x_diff(3));
     
     P += weights_(i)*x_diff*x_diff.transpose();
   }
@@ -328,13 +324,6 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   for (int i = 0; i < 2*n_aug_+1; i++) {
     double px  = Xsig_pred_(0,i);
     double py = Xsig_pred_(1,i);
-    //double v = Xsig_pred_(2,i);
-    //double psi = Xsig_pred_(3,i);
-    //double psi_dot = Xsig_pred_(4,i);
-
-    //double rho = sqrt(px*px+py*py);
-    //double phi = atan2(py,px);
-    //double rho_dot = (px*cos(psi)*v+py*sin(psi)*v)/rho;
     Zsig(0,i) = px;
     Zsig(1,i) = py;
   }
@@ -349,8 +338,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
     VectorXd z_diff = Zsig.col(i) - z_pred;
     
     //angle normalization
-    while (z_diff(1) > M_PI) z_diff(1) -= 2.*M_PI;
-    while (z_diff(1) < -M_PI) z_diff(1) += 2.*M_PI;
+    z_diff(1) = normalize_angle(z_diff(1));
     
     S += weights_(i)*z_diff*z_diff.transpose();
   }
@@ -359,9 +347,6 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   R <<  std_laspx_*std_laspx_, 0,
         0, std_laspy_*std_laspy_;
   S += R;
-  
-  //x_ = z_pred;
-  //P_ = S;
   
   /* Update State */
   //create vector for incoming lidar measurement
@@ -376,12 +361,10 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   //calculate cross correlation matrix
   for (int i = 0; i < 2*n_aug_+1; i++) {
     VectorXd xk_diff = Xsig_pred_.col(i) - x_;
-    while (xk_diff(3) > M_PI) xk_diff(3) -= 2.*M_PI;
-    while (xk_diff(3) < -M_PI) xk_diff(3) += 2.*M_PI;
+    xk_diff(3) = normalize_angle(xk_diff(3));
     
     VectorXd zk_diff = Zsig.col(i) - z_pred;
-    while (zk_diff(1) > M_PI) zk_diff(1) -= 2.*M_PI;
-    while (zk_diff(1) < -M_PI) zk_diff(1) += 2.*M_PI;  
+    zk_diff(1) = normalize_angle(zk_diff(1));
     
     Tc += weights_(i)*xk_diff*zk_diff.transpose();
   }
@@ -391,12 +374,10 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   
   //update state mean and covariance matrix
   VectorXd z_diff = z - z_pred;
-  while (z_diff(1) > M_PI) z_diff(1) -= 2.*M_PI;
-  while (z_diff(1) < -M_PI) z_diff(1) += 2.*M_PI;
+  z_diff(1) = normalize_angle(z_diff(1));
   
   x_ += K*z_diff;
   P_ -= K*S*K.transpose();
-  cout << "***** DONE LIDAR ****\n\n";
 }
 
 /**
@@ -433,7 +414,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     double py = Xsig_pred_(1,i);
     double v = Xsig_pred_(2,i);
     double psi = Xsig_pred_(3,i);
-    //double psi_dot = Xsig_pred_(4,i);
 
     double rho = sqrt(px*px+py*py);
     double phi = atan2(py,px);
@@ -453,9 +433,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     VectorXd z_diff = Zsig.col(i) - z_pred;
     
     //angle normalization
-    while (z_diff(1) > M_PI) z_diff(1) -= 2.*M_PI;
-    while (z_diff(1) < -M_PI) z_diff(1) += 2.*M_PI;
-    
+    z_diff(1) = normalize_angle(z_diff(1));
+
     S += weights_(i)*z_diff*z_diff.transpose();
   }
   
@@ -464,9 +443,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         0, std_radphi_*std_radphi_, 0,
         0, 0, std_radrd_*std_radrd_;
   S += R;
-  
-  //x_ = z_pred;
-  //P_ = S;
   
   /* Update State */
   //create vector for incoming radar measurement
@@ -483,12 +459,10 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   //calculate cross correlation matrix
   for (int i = 0; i < 2*n_aug_+1; i++) {
     VectorXd xk_diff = Xsig_pred_.col(i) - x_;
-    while (xk_diff(3) > M_PI) xk_diff(3) -= 2.*M_PI;
-    while (xk_diff(3) < -M_PI) xk_diff(3) += 2.*M_PI;
+    xk_diff(3) = normalize_angle(xk_diff(3));
     
     VectorXd zk_diff = Zsig.col(i) - z_pred;
-    while (zk_diff(1) > M_PI) zk_diff(1) -= 2.*M_PI;
-    while (zk_diff(1) < -M_PI) zk_diff(1) += 2.*M_PI;  
+    zk_diff(1) = normalize_angle(zk_diff(1));
     
     Tc += weights_(i)*xk_diff*zk_diff.transpose();
   }
@@ -498,10 +472,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   
   //update state mean and covariance matrix
   VectorXd z_diff = z - z_pred;
-  while (z_diff(1) > M_PI) z_diff(1) -= 2.*M_PI;
-  while (z_diff(1) < -M_PI) z_diff(1) += 2.*M_PI;
+  z_diff(1) = normalize_angle(z_diff(1));
   
   x_ += K*z_diff;
   P_ -= K*S*K.transpose();
-  cout << "***** DONE --RADAR-- ****\n\n";
 }
