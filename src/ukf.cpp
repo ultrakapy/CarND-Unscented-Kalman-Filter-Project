@@ -74,6 +74,9 @@ UKF::UKF() {
 
   x_ = VectorXd(n_x_);
   x_ << 1, 1, 1, 1, 0.1;
+
+  laser_NIS_ = 0.0;
+  radar_NIS_ = 0.0;
 }
 
 UKF::~UKF() {}
@@ -170,8 +173,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     }
   }
 
+  cout << "\n";
   cout << "x_ = " << x_ << endl;
   cout << "P_ = " << P_ << endl;
+  cout << "laser_NIS_ = " << laser_NIS_ << endl;
+  cout << "radar_NIS_ = " << radar_NIS_ << endl;
 }
 
 /**
@@ -378,6 +384,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   
   x_ += K*z_diff;
   P_ -= K*S*K.transpose();
+
+  // calculate laser NIS
+  laser_NIS_ = z_diff.transpose()*S.inverse()*z_diff;
 }
 
 /**
@@ -476,4 +485,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   
   x_ += K*z_diff;
   P_ -= K*S*K.transpose();
+
+  // calculate radar NIS
+  radar_NIS_ = z_diff.transpose()*S.inverse()*z_diff;
 }
